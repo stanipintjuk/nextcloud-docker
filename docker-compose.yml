@@ -1,0 +1,73 @@
+version: '2'
+
+volumes:
+        nextcloud:
+        db:
+        proxy:
+        ssl:
+
+services:
+        db:
+                image: mariadb
+                restart: always
+                volumes:
+                        - /mnt/mariadb:/var/lib/mysql
+                networks:
+                        nextcloud-net:
+                                ipv4_address: 10.5.0.3
+
+        proxy:
+                image: jwilder/nginx-proxy
+                restart: always
+                ports:
+                        - 80:80
+                        - 443:443
+                volumes: 
+                        - /etc/nginx/certs:/etc/nginx/certs
+                        - /var/run/docker.sock:/tmp/docker.sock:ro
+                        - /etc/nginx/vhost.d:/etc/nginx/vhost.d
+                        - /usr/share/nginx/html
+                command: "sh -c 'echo \"server_tokens off; client_max_body_size 10G;\" > /etc/nginx/conf.d/my_proxy.conf; forego start -r'"
+                networks:
+                        nextcloud-net:
+                                ipv4_address: 10.5.0.7
+                labels:
+                        com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+
+        ssl:
+                image: jrcs/letsencrypt-nginx-proxy-companion
+                restart: always
+                volumes:
+                        - /etc/nginx/certs:/etc/nginx/certs:rw
+                        - /var/run/docker.sock:/var/run/docker.sock:ro
+                volumes_from:
+                        - proxy
+
+        app:  
+                build: ./custom_nextcloud
+                        
+                restart: always
+                expose:
+                        - "80"
+                ports:
+                        - 8080:80
+                links:
+                        - db
+                volumes:
+                        - /mnt/nextcloud:/var/www/html
+                environment:
+                        - VIRTUAL_HOST=$NEXTCLOUD_DOMAIN_NAME
+                        - LETSENCRYPT_HOST=$NEXTCLOUD_DOMAIN_NAME
+                        - LETSENCRYPT_EMAIL=$MY_EMAIL
+                          #- LETSENCRYPT_TEST=true
+                networks:
+                        nextcloud-net:
+                                ipv4_address: 10.5.0.5
+
+networks:
+        nextcloud-net:
+                driver: bridge
+                ipam:
+                        config:
+                                - subnet: 10.5.0.0/16
+                                  gateway: 10.5.0.1
