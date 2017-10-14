@@ -1,4 +1,7 @@
 #!/bin/bash
+# go to this directory because we don't know from where the execution of this scrips happens
+cd /root/nextcloud
+
 # Copy last log to old
 cat update.log >> updatelog.old
 
@@ -13,7 +16,6 @@ exec 1<>update.log
 # Redirect STDERR to STDOUT
 exec 2>&1
 
-cd /root/nextcloud
 echo "# Pulling latest images"
 /usr/bin/docker-compose pull
 echo ""
